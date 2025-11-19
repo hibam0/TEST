@@ -196,7 +196,30 @@
       background:#eee;
       z-index:1100;
     }
-    #progressBar{height:100%;width:0;background:#4b2e83;transition:width .3s;}
+#progressBar{height:100%;width:0;background:#4b2e83;transition:width .3s;}
+
+    /* Fullscreen reminder (shows when user exits with Esc) */
+    #fullscreenReminder {
+      position: fixed;
+      right: 12px;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid #e2d8f8;
+      border-radius: 14px;
+      box-shadow: 0 12px 30px rgba(75,46,131,.18);
+      z-index: 1300;
+    }
+
+    #fullscreenReminder button {
+      padding: 10px 16px;
+      border-radius: 12px;
+      font-size: 1rem;
+      box-shadow: none;
+    }
 
     /* Keep trial button visible at bottom of the screen */
     #trialControls{
@@ -213,6 +236,10 @@
   
 <body>
   <div id="overlay" style="display:none;"></div>
+  <div id="fullscreenReminder" role="alert" aria-live="polite">
+    <span style="color:#4b2e83;font-weight:700;">Full screen keeps the game distraction-free.</span>
+    <button id="returnFullscreen" class="btn-primary" type="button">Go fullscreen</button>
+  </div>
   <div id="progressWrapper"><div id="progressBar"></div></div>
   <div id="visual-container">
     <div id="screen"></div>
@@ -355,6 +382,7 @@ let currentAnimalAudio = null;
 let trialsInCurrentBlock = 0;
 let animalsShownInBlock = 0;
 let fullscreenRequested = false;
+let fullscreenEverRequested = false;
 
 function trialsFor(block) {
   const len = blocks[block] && Array.isArray(blocks[block]) ? blocks[block].length : 0;
@@ -373,18 +401,29 @@ function totalTrialsCount() {
 function requestFullscreenIfSupported() {
   const el = document.documentElement;
   if (!el || typeof el.requestFullscreen !== "function") return;
+  fullscreenEverRequested = true;
   if (document.fullscreenElement) {
     fullscreenRequested = true;
+    updateFullscreenReminder();
     return;
   }
   if (fullscreenRequested) return;
 
   el.requestFullscreen().then(() => {
     fullscreenRequested = true;
+    updateFullscreenReminder();
   }).catch(err => {
     fullscreenRequested = false;
+    updateFullscreenReminder();
     console.warn("Fullscreen request failed:", err);
   });
+}
+
+function updateFullscreenReminder() {
+  const reminder = document.getElementById("fullscreenReminder");
+  if (!reminder) return;
+  const shouldShow = fullscreenEverRequested && !document.fullscreenElement;
+  reminder.style.display = shouldShow ? "flex" : "none";
 }
 
 function waitForAudioReady(audioEl) {
@@ -543,6 +582,14 @@ window.onload = async () => {
   window.addEventListener("touchend", primeHandler, { once: true });
   window.addEventListener("keydown", primeHandler, { once: true });
 
+  const fullscreenButton = document.getElementById("returnFullscreen");
+  if (fullscreenButton) {
+    fullscreenButton.addEventListener("click", () => {
+      requestFullscreenIfSupported();
+      updateFullscreenReminder();
+    });
+  }
+
   const fullscreenHandler = () => requestFullscreenIfSupported();
   window.addEventListener("click", fullscreenHandler, { once: true });
   window.addEventListener("touchend", fullscreenHandler, { once: true });
@@ -550,7 +597,10 @@ window.onload = async () => {
 
   document.addEventListener("fullscreenchange", () => {
     if (!document.fullscreenElement) fullscreenRequested = false;
+    updateFullscreenReminder();
   });
+
+  updateFullscreenReminder();
 
   while (!participantID) {
     participantID = prompt("Enter your Participant ID:");
@@ -1441,7 +1491,7 @@ function showRealTrialsIntro() {
   const startBtn = document.getElementById("startRealTrials");
   const audio = document.getElementById("realInstructionsAudio");
 
- playBtn.addEventListener("click", async () => {
+playBtn.addEventListener("click", async () => {
     requestFullscreenIfSupported();
     playBtn.disabled = true;
     try {
@@ -1453,7 +1503,6 @@ function showRealTrialsIntro() {
       startBtn.style.display = "inline-block";
     };
   });
-
 startBtn.addEventListener("click", () => {
     requestFullscreenIfSupported();
     startRealTrials();
@@ -2132,6 +2181,7 @@ function runScreenCleanup() {
 </script>
 </body>
 </html>
+
 
 
 
