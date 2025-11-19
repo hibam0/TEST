@@ -249,6 +249,7 @@ const ANIMALS = [
 
 const BACKENDLESS_URL = "https://api.backendless.com/04D99C8B-3B22-454C-889B-5E66A5798C47/38037288-90E3-4F8A-87D6-E052FCD03D67/data/responses";
 const OFFLINE_QUEUE_KEY = "melody_offline_responses";
+let audioPrimed = false;
 
 function loadOfflineQueue() {
   if (typeof localStorage === "undefined") return [];
@@ -411,7 +412,7 @@ const AudioEngine = (() => {
     narration: 0.5,  // voice MP3s
     sfx:       0.5,  // correct/wrong/animals
     video:     12.0,  // quiet MP4s
-    music:     20.0   // #myAudio trials
+    music:     15.0   // #myAudio trials
   };
 
   function groupFor(el) {
@@ -465,7 +466,7 @@ const AudioEngine = (() => {
     }
   }
 
-  function setGroupGain(group, value) {
+function setGroupGain(group, value) {
     groups[group] = value;
     for (const rec of sources.values()) {
       if (rec.group === group) rec.gain.gain.value = value;
@@ -475,6 +476,26 @@ const AudioEngine = (() => {
 return { start, attach, attachAll, setGroupGain, groups };
 })();
 
+async function primeAudioEngine() {
+  if (audioPrimed) return;
+
+  try {
+    await AudioEngine.start();
+    AudioEngine.attachAll(document);
+
+    AudioEngine.setGroupGain("video", 5.0);
+    AudioEngine.setGroupGain("music", 3.0);
+    AudioEngine.setGroupGain("narration", 0.8);
+    AudioEngine.setGroupGain("sfx", 0.8);
+
+    audioPrimed = true;
+  } catch (err) {
+    audioPrimed = false;
+    console.warn("Failed to prime audio engine", err);
+    throw err;
+  }
+}
+  
 async function saveResponse(entry, { maxAttempts = 3, retryDelayMs = 500 } = {}) {
   let lastError = null;
 
@@ -497,22 +518,12 @@ window.addEventListener("online", () => {
 });
 
 window.onload = async () => {
-  // Prime WebAudio on first gesture (click/touch/key)
-  const prime = async () => {
-    await AudioEngine.start();
-    AudioEngine.attachAll(document);               // wire everything now that ctx is allowed
+  flushOfflineQueue().catch(err => console.warn("Failed to flush offline queue on load", err));
 
-    AudioEngine.setGroupGain("video", 5.0); 
-    AudioEngine.setGroupGain("music", 3.0);
-    AudioEngine.setGroupGain("narration", 0.8);
-    AudioEngine.setGroupGain("sfx", 0.8);
-  };
-
-    flushOfflineQueue().catch(err => console.warn("Failed to flush offline queue on load", err));
-
-  window.addEventListener("click", prime, { once: true });
-  window.addEventListener("touchend", prime, { once: true });
-  window.addEventListener("keydown", prime, { once: true });
+  const primeHandler = () => primeAudioEngine().catch(err => console.warn("Prime handler failed", err));
+  window.addEventListener("click", primeHandler, { once: true });
+  window.addEventListener("touchend", primeHandler, { once: true });
+  window.addEventListener("keydown", primeHandler, { once: true });
 
   while (!participantID) {
     participantID = prompt("Enter your Participant ID:");
@@ -617,7 +628,7 @@ function prepareShuffledBlocks({ useSeed = true } = {}) {
   // Preload animal sounds (not in DOM) — safe to queue before gesture
   ANIMALS.forEach(a => { a.audio = new Audio(a.sound); AudioEngine.attach(a.audio); });
 
-  showIntroScreen();
+  showVolumeCheckScreen();
 };
 
 function updateScreen(html, background=null){
@@ -667,6 +678,60 @@ async function loadCSVData(blockType) {
   }
   blocks[blockType] = parsed;
   console.log(`Loaded ${parsed.length} trials for ${blockType}`);
+}
+
+function showVolumeCheckScreen() {
+  updateScreen(`
+    <div class="response-wrapper">
+      <div class="response-screen">
+        <h1>Sound Check</h1>
+        <p style="font-size:1.2em;line-height:1.6;">
+          Parents or caregivers: please adjust the device volume so your child can hear clearly.
+          Tap Play to hear a short sample, then continue once the sound level feels right.
+        </p>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;">
+          <button id="playSample" class="btn-primary">Play sample</button>
+          <button id="continueAfterVolume" class="btn-primary" disabled>Sounds good</button>
+        </div>
+        <audio id="volumeSample" src="PITCH_INSTRUCTIONS.mp3" preload="auto"></audio>
+      </div>
+    </div>
+  `);
+
+  const sample = document.getElementById("volumeSample");
+  const playBtn = document.getElementById("playSample");
+  const continueBtn = document.getElementById("continueAfterVolume");
+
+  AudioEngine.attach(sample);
+
+  const enableContinue = () => { continueBtn.disabled = false; };
+  sample.addEventListener("ended", enableContinue);
+  sample.addEventListener("error", enableContinue);
+
+  playBtn.addEventListener("click", async () => {
+    playBtn.disabled = true;
+    continueBtn.disabled = true;
+    try {
+      await primeAudioEngine();
+      sample.currentTime = 0;
+      await sample.play();
+    } catch (err) {
+      console.warn("Sample playback failed", err);
+      enableContinue();
+    } finally {
+      playBtn.disabled = false;
+    }
+  });
+
+  continueBtn.addEventListener("click", async () => {
+    continueBtn.disabled = true;
+    try {
+      await primeAudioEngine();
+    } catch (err) {
+      console.warn("Failed to confirm priming on continue", err);
+    }
+    showIntroScreen();
+  });
 }
 
 function showIntroScreen() {
@@ -2032,6 +2097,7 @@ function runScreenCleanup() {
 </script>
 </body>
 </html>
+
 
 
 
