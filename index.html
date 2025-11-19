@@ -354,6 +354,7 @@ let animalIndex = 0;
 let currentAnimalAudio = null;
 let trialsInCurrentBlock = 0;
 let animalsShownInBlock = 0;
+let fullscreenRequested = false;
 
 function trialsFor(block) {
   const len = blocks[block] && Array.isArray(blocks[block]) ? blocks[block].length : 0;
@@ -367,6 +368,23 @@ function animalIntervalFor(block) {
 
 function totalTrialsCount() {
   return BLOCK_ORDER.reduce((sum, b) => sum + (blocks[b] && Array.isArray(blocks[b]) && blocks[b].length ? blocks[b].length : FALLBACK_TRIALS_PER_BLOCK), 0);
+}
+
+function requestFullscreenIfSupported() {
+  const el = document.documentElement;
+  if (!el || typeof el.requestFullscreen !== "function") return;
+  if (document.fullscreenElement) {
+    fullscreenRequested = true;
+    return;
+  }
+  if (fullscreenRequested) return;
+
+  el.requestFullscreen().then(() => {
+    fullscreenRequested = true;
+  }).catch(err => {
+    fullscreenRequested = false;
+    console.warn("Fullscreen request failed:", err);
+  });
 }
 
 function waitForAudioReady(audioEl) {
@@ -524,6 +542,15 @@ window.onload = async () => {
   window.addEventListener("click", primeHandler, { once: true });
   window.addEventListener("touchend", primeHandler, { once: true });
   window.addEventListener("keydown", primeHandler, { once: true });
+
+  const fullscreenHandler = () => requestFullscreenIfSupported();
+  window.addEventListener("click", fullscreenHandler, { once: true });
+  window.addEventListener("touchend", fullscreenHandler, { once: true });
+  window.addEventListener("keydown", fullscreenHandler, { once: true });
+
+  document.addEventListener("fullscreenchange", () => {
+    if (!document.fullscreenElement) fullscreenRequested = false;
+  });
 
   while (!participantID) {
     participantID = prompt("Enter your Participant ID:");
@@ -708,7 +735,8 @@ function showVolumeCheckScreen() {
   sample.addEventListener("ended", enableContinue);
   sample.addEventListener("error", enableContinue);
 
-  playBtn.addEventListener("click", async () => {
+ playBtn.addEventListener("click", async () => {
+    requestFullscreenIfSupported();
     playBtn.disabled = true;
     continueBtn.disabled = true;
     try {
@@ -724,6 +752,7 @@ function showVolumeCheckScreen() {
   });
 
   continueBtn.addEventListener("click", async () => {
+    requestFullscreenIfSupported();
     continueBtn.disabled = true;
     try {
       await primeAudioEngine();
@@ -754,10 +783,11 @@ function showIntroScreen() {
     </div>
   `);
 
-  const introAudio = document.getElementById("introAudio");
+ const introAudio = document.getElementById("introAudio");
   const continueBtn = document.getElementById("continueIntro");
 
   continueBtn.addEventListener("click", async () => {
+    requestFullscreenIfSupported();
     continueBtn.disabled = true;
     try {
       await introAudio.play();
@@ -817,6 +847,7 @@ function showNarrationScreen() {
   const audio = document.getElementById("introNarration3");
 
   button.addEventListener("click", async () => {
+    requestFullscreenIfSupported();
     button.disabled = true;
     try {
       await audio.play();
@@ -1410,7 +1441,8 @@ function showRealTrialsIntro() {
   const startBtn = document.getElementById("startRealTrials");
   const audio = document.getElementById("realInstructionsAudio");
 
-  playBtn.addEventListener("click", async () => {
+ playBtn.addEventListener("click", async () => {
+    requestFullscreenIfSupported();
     playBtn.disabled = true;
     try {
       await audio.play();
@@ -1422,7 +1454,10 @@ function showRealTrialsIntro() {
     };
   });
 
-  startBtn.addEventListener("click", startRealTrials);
+startBtn.addEventListener("click", () => {
+    requestFullscreenIfSupported();
+    startRealTrials();
+  });
 }
 
 async function startRealTrials() {
@@ -2097,6 +2132,7 @@ function runScreenCleanup() {
 </script>
 </body>
 </html>
+
 
 
 
