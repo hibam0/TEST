@@ -1418,7 +1418,7 @@ function updatePlayButton() {
   const block = BLOCK_ORDER[currentBlockIndex];
   const trialControls = document.getElementById("trialControls");
   const total = trialsFor(block);
-  trialControls.innerHTML = `<button id="playButton" class="btn-primary">Start ${block.toUpperCase()} Trial ${trialCounter} of ${total}</button>`;
+  trialControls.innerHTML = `<button id="playButton" class="btn-primary">${block.toUpperCase()} Trial ${trialCounter} of 32, GO!</button>`;
   document.getElementById("playButton").addEventListener("click", playTrial);
 }
 function hideAll() {
@@ -1816,7 +1816,7 @@ function showAnimalScreen(callback) {
 
   const btn = document.getElementById("continueAnimal");
   const countdownEl = document.getElementById("animalCountdown");
-  let secondsLeft = 20;
+  let secondsLeft = 10;
   btn.disabled = true;
 
   // Countdown timer
@@ -2032,6 +2032,7 @@ function runScreenCleanup() {
 </script>
 </body>
 </html>
+
 
 
 
